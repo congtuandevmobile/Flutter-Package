@@ -1,0 +1,12 @@
+name: FlutterPackage
+environment:
+  sdk: ^3.10.7
+
+workspace:
+  - apps/flutter_package
+  - packages/flutter_shared_ui
+  - packages/flutter_math
+  - packages/flutter_health_kit
+
+dev_dependencies:
+  melos: ^7.3.0

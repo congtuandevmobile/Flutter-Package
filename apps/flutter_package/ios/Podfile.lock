@@ -1,0 +1,28 @@
+PODS:
+  - Flutter (1.0.0)
+  - flutter_health_kit (0.0.1):
+    - Flutter
+  - flutter_math (0.0.1):
+    - Flutter
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - flutter_health_kit (from `.symlinks/plugins/flutter_health_kit/ios`)
+  - flutter_math (from `.symlinks/plugins/flutter_math/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  flutter_health_kit:
+    :path: ".symlinks/plugins/flutter_health_kit/ios"
+  flutter_math:
+    :path: ".symlinks/plugins/flutter_math/ios"
+
+SPEC CHECKSUMS:
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  flutter_health_kit: 8194e4366329c89bcee752f818fab84f3220af9a
+  flutter_math: 19ebf11e912d5d28ae806d947e41ebf370d1ad91
+
+PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
+
+COCOAPODS: 1.16.2
