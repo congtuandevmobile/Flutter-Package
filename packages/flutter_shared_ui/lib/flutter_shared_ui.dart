@@ -1,6 +1,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_shared_ui/flutter_config_plugin/config_plugin_test_screen.dart';
 import 'package:flutter_shared_ui/flutter_health_kit/health_kit_test_screen.dart';
 import 'package:flutter_shared_ui/flutter_math/flutter_math_test_screen.dart';
 import 'package:flutter_shared_ui/widgets/menu_button.dart';
@@ -31,6 +32,17 @@ class SharedScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const HealthKitTestScreen(),
+                ),
+              );
+            },
+          ),
+          MenuButton(
+            title: "Test Flutter Config Plugin",
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ConfigPluginTestScreen(),
                 ),
               );
             },

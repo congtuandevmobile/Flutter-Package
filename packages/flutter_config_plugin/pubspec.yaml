@@ -1,0 +1,16 @@
+name: flutter_config_plugin
+description: A Flutter config plugin system inspired by expo/config-plugins. Programmatically modify iOS and Android native project files through a composable plugin pipeline.
+version: 0.0.1-beta
+repository: https://github.com/congtuandevmobile/Flutter-Package
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  xml: ^6.0.0
+  path: ^1.8.0
+  yaml: ^3.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.24.0

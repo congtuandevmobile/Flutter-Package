@@ -1,6 +1,7 @@
 name: flutter_shared_ui
 description: "A new Flutter package project."
 version: 0.0.1
+publish_to: none
 homepage:
 
 environment:
@@ -14,6 +15,9 @@ dependencies:
     path: ../flutter_math
   flutter_health_kit:
     path: ../flutter_health_kit
+  flutter_config_plugin:
+    path: ../flutter_config_plugin
+  path: ^1.8.0
 
 resolution: workspace
 

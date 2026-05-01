@@ -1,0 +1,11 @@
+{
+  "configurations": [
+    {
+      "name": "Flutter (lib/flutter_shared_ui.dart)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "packages/flutter_shared_ui",
+      "program": "lib/flutter_shared_ui.dart"
+    }
+  ]
+}

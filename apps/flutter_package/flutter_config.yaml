@@ -1,0 +1,221 @@
+# flutter_config.yaml — UpRace
+#
+# Run: dart run flutter_config_plugin:flutter_config
+# Dev: điền giá trị vào .env  |  CI: set variables trong GitLab CI/CD → Variables
+#
+# Không có named plugin. Mọi thứ tự config qua generic: ở dưới.
+# Khi install SDK mới → đọc docs → thêm vào đúng section.
+
+app:
+  name: ${APP_NAME}
+  bundleIdentifier: ${BUNDLE_ID}
+  applicationId: ${APPLICATION_ID}
+  version: "1.0.0"
+
+generic:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # iOS — Info.plist
+  # ═══════════════════════════════════════════════════════════════════════════
+  ios:
+    infoPlist:
+      # ── API & Config ────────────────────────────────────────────────────
+      API_URL: ${API_URL}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      CADisableMinimumFrameDurationOnPhone: true
+
+      # ── Google Sign-In ──────────────────────────────────────────────────
+      GIDClientID: ${GOOGLE_CLIENT_ID}
+
+      # ── BGTaskScheduler ─────────────────────────────────────────────────
+      BGTaskSchedulerPermittedIdentifiers:
+        - com.uprace.healthkit.sync
+
+      # ── Facebook SDK ────────────────────────────────────────────────────
+      # Docs: https://developers.facebook.com/docs/ios/getting-started
+      FacebookAppID: ${FACEBOOK_APP_ID}
+      FacebookClientToken: ${FACEBOOK_CLIENT_TOKEN}
+      FacebookDisplayName: ${APP_NAME}
+
+      # ── flutter_background_geolocation (Transistorsoft) ─────────────────
+      # Docs: https://transistorsoft.github.io/flutter_background_geolocation
+      TSLocationManagerLicense: ${BG_GEOLOCATION_LICENSE}
+
+    # ── iOS Permissions ───────────────────────────────────────────────────
+    # Đây là NSXxxUsageDescription keys trong Info.plist — không có file riêng
+    permissions:
+      NSCameraUsageDescription: '"UpRace" needs access to your camera to let you take a profile avatar photo.'
+      NSMicrophoneUsageDescription: '"UpRace" needs access to your microphone.'
+      NSPhotoLibraryUsageDescription: 'UpRace needs access to your photo library to let you set a profile avatar.'
+      NSPhotoLibraryAddUsageDescription: '"UpRace" needs access to save photos to your library.'
+      NSLocationWhenInUseUsageDescription: '"UpRace" needs access to your location to track your running activities.'
+      NSLocationAlwaysAndWhenInUseUsageDescription: '"UpRace" needs background location access to track your running activities.'
+      NSMotionUsageDescription: 'UpRace uses motion data to improve activity tracking accuracy.'
+      NSHealthShareUsageDescription: '"UpRace" needs read access to your health data to sync your activities.'
+      NSHealthUpdateUsageDescription: '"UpRace" needs write access to your health data.'
+
+    # ── UIBackgroundModes ─────────────────────────────────────────────────
+    backgroundModes:
+      - location           # flutter_background_geolocation
+      - fetch              # flutter_background_geolocation
+      - processing         # flutter_background_geolocation + BGTaskScheduler
+      - remote-notification
+
+    # ── CFBundleURLTypes — URL Schemes ────────────────────────────────────
+    urlSchemes:
+      # Google Sign-In
+      - role: Editor
+        schemes:
+          - ${GOOGLE_REVERSED_CLIENT_ID}
+
+      # Facebook Login — prefix "fb" + app ID
+      - schemes:
+          - fb${FACEBOOK_APP_ID}
+
+      # Web Auth Callback (uprace://, vnguprace://)
+      - role: Editor
+        name: uprace_callback
+        schemes:
+          - ${URL_SCHEME}
+          - ${URL_SCHEME_UAT}
+
+    # ── LSApplicationQueriesSchemes ───────────────────────────────────────
+    queriesSchemes:
+      - App-prefs
+      - facebook-stories
+      - fbapi
+      - fb-messenger-share-api
+      - instagram-stories
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Android — AndroidManifest.xml + strings.xml
+  # ═══════════════════════════════════════════════════════════════════════════
+  android:
+
+    # ── <uses-permission> ─────────────────────────────────────────────────
+    permissions:
+      - android.permission.INTERNET
+      - android.permission.ACCESS_NETWORK_STATE
+      # Camera & Media
+      - android.permission.CAMERA
+      - android.permission.READ_MEDIA_IMAGES
+      - android.permission.READ_MEDIA_VIDEO
+      - name: android.permission.READ_EXTERNAL_STORAGE
+        maxSdkVersion: 32
+      - name: android.permission.WRITE_EXTERNAL_STORAGE
+        maxSdkVersion: 32
+      # Location
+      - android.permission.ACCESS_FINE_LOCATION
+      - android.permission.ACCESS_COARSE_LOCATION
+      - android.permission.ACCESS_BACKGROUND_LOCATION
+      - android.permission.FOREGROUND_SERVICE
+      - android.permission.FOREGROUND_SERVICE_LOCATION
+      - android.permission.FOREGROUND_SERVICE_DATA_SYNC
+      - android.permission.RECEIVE_BOOT_COMPLETED
+      # Notifications (Android 13+)
+      - android.permission.POST_NOTIFICATIONS
+      # Battery Optimization
+      - android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+      # Activity Recognition
+      - android.permission.ACTIVITY_RECOGNITION
+      - com.google.android.gms.permission.ACTIVITY_RECOGNITION
+
+    # ── res/values/strings.xml ────────────────────────────────────────────
+    # Facebook yêu cầu key ở strings resource để tham chiếu bằng @string/
+    strings:
+      - name: facebook_app_id
+        value: ${FACEBOOK_APP_ID}
+      - name: facebook_client_token
+        value: ${FACEBOOK_CLIENT_TOKEN}
+
+    manifest:
+      application:
+        # ── <meta-data> ────────────────────────────────────────────────
+        meta-data:
+          - name: flutterEmbedding
+            value: "2"
+          # Google Maps
+          - name: com.google.android.geo.API_KEY
+            value: ${GOOGLE_MAPS_API_KEY}
+          - name: com.google.android.gms.maps.RENDERER
+            value: LATEST
+          # Facebook — giá trị là @string/ reference, không phải raw value
+          - name: com.facebook.sdk.ApplicationId
+            value: '@string/facebook_app_id'
+          - name: com.facebook.sdk.ClientToken
+            value: '@string/facebook_client_token'
+          # flutter_background_geolocation license
+          - name: com.transistorsoft.locationmanager.license
+            value: ${BG_GEOLOCATION_LICENSE}
+
+        # ── <service> ──────────────────────────────────────────────────
+        services:
+          # flutter_background_geolocation
+          - name: com.transistorsoft.locationmanager.service.TrackingService
+            foregroundServiceType: location
+          - name: com.transistorsoft.locationmanager.service.LocationRequestService
+            foregroundServiceType: location
+          - name: com.transistorsoft.locationmanager.service.ActivityRecognitionService
+            foregroundServiceType: dataSync
+            exported: false
+
+        # ── <receiver> ─────────────────────────────────────────────────
+        receivers:
+          - name: com.transistorsoft.locationmanager.util.BootReceiver
+            exported: false
+            intentFilters:
+              - actions:
+                  - android.intent.action.BOOT_COMPLETED
+                  - android.intent.action.QUICKBOOT_POWERON
+                  - com.htc.intent.action.QUICKBOOT_POWERON
+
+        # ── <activity> (ngoài MainActivity) ───────────────────────────
+        activities:
+          # flutter_web_auth_2 — OAuth / deep link callback
+          # label: attribute trên <intent-filter>, không phải activity
+          - name: com.linusu.flutter_web_auth_2.CallbackActivity
+            exported: true
+            intentFilters:
+              - label: flutter_web_auth_2
+                actions:
+                  - android.intent.action.VIEW
+                categories:
+                  - android.intent.category.DEFAULT
+                  - android.intent.category.BROWSABLE
+                # Nhiều scheme → dùng dataList (mỗi scheme là một <data> element riêng)
+                dataList:
+                  - scheme: ${URL_SCHEME}
+                  - scheme: ${URL_SCHEME_UAT}
+
+        # ── <provider> ─────────────────────────────────────────────────
+        providers:
+          - name: androidx.core.content.FileProvider
+            authorities: ${APPLICATION_ID}.fileprovider
+            exported: false
+            grantUriPermissions: true
+            metaData:
+              - name: android.support.FILE_PROVIDER_PATHS
+                resource: '@xml/file_paths'
+
+      # ── <queries> ──────────────────────────────────────────────────────
+      queries:
+        # Flutter engine text processing
+        - intent:
+            action: android.intent.action.PROCESS_TEXT
+            data:
+              mimeType: text/plain
+
+        # Facebook
+        - provider: com.facebook.katana.provider.PlatformProvider
+        - package: com.facebook.katana
+        - intent:
+            action: com.facebook.stories.ADD_TO_STORY
+
+        # Instagram
+        - package: com.instagram.android
+        - intent:
+            action: com.instagram.share.ADD_TO_STORY
+
+        # Text-To-Speech (flutter_tts)
+        - intent:
+            action: android.intent.action.TTS_SERVICE

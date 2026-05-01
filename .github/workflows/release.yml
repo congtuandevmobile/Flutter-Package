@@ -1,0 +1,122 @@
+name: Release Flutter Config Plugin
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - packages/flutter_config_plugin/pubspec.yaml
+      - packages/flutter_config_plugin/CHANGELOG.md
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: packages/flutter_config_plugin
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Step 2: Setup Dart
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: dart pub get
+
+      # Step 4: Read version from pubspec.yaml
+      - name: Read package version
+        id: version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "Detected Pre-release version: $VERSION"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "Detected Release version: $VERSION"
+          fi
+
+      # Step 5: Ensure tag doesn't already exist
+      - name: Check if tag exists
+        working-directory: .
+        run: |
+          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "❌ Tag ${{ steps.version.outputs.tag }} already exists"
+            exit 1
+          fi
+
+      # Step 6: Extract release notes from CHANGELOG.md
+      - name: Generate release notes from CHANGELOG
+        id: notes
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+
+          if ! grep -q "## $TAG" CHANGELOG.md; then
+            echo "❌ No changelog entry found for $TAG"
+            exit 1
+          fi
+
+          awk -v ver="## $TAG" '
+            $0 == ver { flag=1; next }
+            /^## v/ && flag { exit }
+            flag
+          ' CHANGELOG.md > release.md
+
+          echo "📄 Release notes:"
+          cat release.md
+
+      # Step 7: Validate package
+      # Strip "resolution: workspace" first — this field is only valid in local
+      # workspaces and causes pub.dev to reject the package outright.
+      - name: Validate package (dry run)
+        run: |
+          sed -i '/^resolution:/d' pubspec.yaml
+          dart pub publish --dry-run
+
+      # Step 8: Publish to pub.dev
+      - name: Write pub credentials
+        run: |
+          mkdir -p "$HOME/.config/dart"
+          echo '${{ secrets.PUB_CREDENTIALS }}' > "$HOME/.config/dart/pub-credentials.json"
+
+      - name: Publish to pub.dev
+        run: dart pub publish --force
+
+      # Step 9: Create git tag
+      - name: Configure git
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create git tag
+        working-directory: .
+        run: |
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
+
+      # Step 10: Create GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          body_path: packages/flutter_config_plugin/release.md
+          prerelease: ${{ steps.version.outputs.is_prerelease }}

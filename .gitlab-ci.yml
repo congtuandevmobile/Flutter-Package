@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# GitLab CI/CD — Flutter monorepo
+#
+# Secrets: Settings → CI/CD → Variables (thiết lập tất cả keys ở đây, không
+# commit .env lên git)
+#
+# Variables cần set trong GitLab:
+#   APP_NAME, BUNDLE_ID, APPLICATION_ID, URL_SCHEME, URL_SCHEME_UAT
+#   API_URL
+#   GOOGLE_MAPS_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_REVERSED_CLIENT_ID
+#   FACEBOOK_APP_ID, FACEBOOK_CLIENT_TOKEN
+#   BG_GEOLOCATION_LICENSE
+# ─────────────────────────────────────────────────────────────────────────────
+
+variables:
+  FLUTTER_VERSION: "3.27.0"          # pin version để build reproducible
+  APP_DIR: apps/flutter_package
+
+# ── Cache ────────────────────────────────────────────────────────────────────
+.cache: &cache
+  cache:
+    key: flutter-$FLUTTER_VERSION
+    paths:
+      - $HOME/.pub-cache/
+      - .dart_tool/
+
+# ── Base image / before_script ────────────────────────────────────────────────
+.flutter_base:
+  image: ghcr.io/cirruslabs/flutter:$FLUTTER_VERSION  # hoặc dùng image nội bộ
+  before_script:
+    - flutter --version
+    - flutter pub get
+    # Inject config từ GitLab Variables → native files
+    # Tất cả ${VAR} trong flutter_config.yaml sẽ được resolve từ env của CI job
+    - dart run flutter_config_plugin:flutter_config $APP_DIR
+
+# ── Stages ────────────────────────────────────────────────────────────────────
+stages:
+  - validate
+  - build
+
+# ── validate: chạy nhanh, không build binary ─────────────────────────────────
+config-check:
+  extends: .flutter_base
+  stage: validate
+  <<: *cache
+  script:
+    # --check mode: so sánh file hiện tại vs expected, exit 1 nếu lệch
+    - dart run flutter_config_plugin:flutter_config $APP_DIR --check
+    - flutter analyze $APP_DIR
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# ── build Android ─────────────────────────────────────────────────────────────
+build-android:
+  extends: .flutter_base
+  stage: build
+  <<: *cache
+  script:
+    - cd $APP_DIR && flutter build appbundle --release
+  artifacts:
+    paths:
+      - $APP_DIR/build/app/outputs/bundle/release/*.aab
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG                            # tag → release build
+
+# ── build iOS (chỉ chạy trên macOS runner) ───────────────────────────────────
+build-ios:
+  extends: .flutter_base
+  stage: build
+  <<: *cache
+  tags:
+    - macos                                         # GitLab runner tag macOS
+  script:
+    - cd $APP_DIR && flutter build ios --release --no-codesign
+  artifacts:
+    paths:
+      - $APP_DIR/build/ios/iphoneos/Runner.app
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
