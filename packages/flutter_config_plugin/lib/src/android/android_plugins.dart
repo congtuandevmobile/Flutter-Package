@@ -148,7 +148,7 @@ ConfigPlugin withMinSdkVersion(int version) {
       });
 }
 
-/// Set an <application> meta-data.
+/// Set an `<application>` meta-data.
 ConfigPlugin withAndroidApplicationMetaData(String name, String value) {
   return (config) => withAndroidManifest(config, (doc) {
         final app = doc.rootElement.findElements('application').firstOrNull;

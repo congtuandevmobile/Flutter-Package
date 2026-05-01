@@ -16,6 +16,8 @@ enum AndroidOrientation {
   unspecified('unspecified');
 
   const AndroidOrientation(this.value);
+
+  /// The string value used in `android:screenOrientation`.
   final String value;
 }
 

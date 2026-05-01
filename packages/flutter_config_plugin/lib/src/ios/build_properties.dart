@@ -35,7 +35,7 @@ ConfigPlugin withIosBuildProperties(Map<String, String> properties) {
             existing[e.key] = e.value;
           }
           await file.writeAsString(
-              const JsonEncoder.withIndent('  ').convert(existing) + '\n');
+              '${const JsonEncoder.withIndent('  ').convert(existing)}\n');
           return props;
         },
       );

@@ -86,6 +86,8 @@ export 'src/ios/provisioning_profile.dart';
 // ── Android ──────────────────────────────────────────────────────────────────
 
 export 'src/android/android_base_mods.dart';
+export 'src/android/android_plugins.dart'
+    hide withAndroidPermission, withAndroidPermissionMaxSdk, withAndroidAppLabel; // re-exported individually
 export 'src/android/manifest_helpers.dart';
 export 'src/android/resources.dart';
 export 'src/android/properties.dart';

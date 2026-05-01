@@ -53,7 +53,7 @@ class FlutterConfig {
   final String version;
 
   /// Registered mods, keyed by platform then mod-name.
-  /// e.g. mods['ios']['infoPlist'] = <ConfigMod>
+  /// e.g. `mods['ios']['infoPlist'] = <ConfigMod>`
   final Map<String, Map<String, ConfigMod>> mods;
 
   /// Internal book-keeping (plugin history, introspection results).
@@ -110,7 +110,7 @@ class ExportedConfig {
   final FlutterConfig config;
 
   /// Parsed representation of the file being processed.
-  /// Type depends on the mod: Map<String,dynamic> for plists/XML,
+  /// Type depends on the mod: `Map<String,dynamic>` for plists/XML,
   /// String for raw-text mods (Podfile, Gradle), etc.
   final dynamic modResults;
 
@@ -146,7 +146,7 @@ class ModRequest {
   /// Root of the Flutter project (contains pubspec.yaml).
   final String projectRoot;
 
-  /// Root of the platform sub-project (e.g. <root>/ios or <root>/android).
+  /// Root of the platform sub-project (e.g. `<root>/ios` or `<root>/android`).
   final String platformProjectRoot;
 
   /// 'ios' or 'android'.

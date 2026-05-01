@@ -11,7 +11,7 @@ import '../with_mod.dart';
 // ---------------------------------------------------------------------------
 
 /// Add supported locales to resConfigs in app/build.gradle and create
-/// values-<locale>/strings.xml files.
+/// `values-<locale>/strings.xml` files.
 ///
 /// [locales]: map of locale code → map of string key → translated value.
 /// e.g. `{ 'fr': { 'app_name': 'Mon App' } }`

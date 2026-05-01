@@ -12,7 +12,7 @@ Future<XmlDocument> readXmlAsync(String filePath) async {
 /// Write an [XmlDocument] to a file, pretty-printed.
 Future<void> writeXmlAsync(String filePath, XmlDocument doc) async {
   await File(filePath).writeAsString(
-    doc.toXmlString(pretty: true, indent: '    ') + '\n',
+    '${doc.toXmlString(pretty: true, indent: '    ')}\n',
   );
 }
 

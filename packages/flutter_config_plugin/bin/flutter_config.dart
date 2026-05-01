@@ -1,21 +1,21 @@
-/// flutter_config CLI
-///
-/// Usage:
-///   dart run flutter_config_plugin:flutter_config [project_root] [options]
-///
-/// Arguments:
-///   project_root   Path to the Flutter project (default: current directory).
-///
-/// Options:
-///   --dry-run      Parse and resolve config but do NOT write native files.
-///   --check        Print which installed packages need configuration and exit.
-///   --no-fail-env  Do not exit with error when required env vars are missing.
-///   --platforms    Comma-separated list: ios,android  (default: ios,android)
-///
-/// Examples:
-///   dart run flutter_config_plugin:flutter_config
-///   dart run flutter_config_plugin:flutter_config /path/to/app --dry-run
-///   dart run flutter_config_plugin:flutter_config --platforms android
+// flutter_config CLI
+//
+// Usage:
+//   dart run flutter_config_plugin:flutter_config [project_root] [options]
+//
+// Arguments:
+//   project_root   Path to the Flutter project (default: current directory).
+//
+// Options:
+//   --dry-run      Parse and resolve config but do NOT write native files.
+//   --check        Print which installed packages need configuration and exit.
+//   --no-fail-env  Do not exit with error when required env vars are missing.
+//   --platforms    Comma-separated list: ios,android  (default: ios,android)
+//
+// Examples:
+//   dart run flutter_config_plugin:flutter_config
+//   dart run flutter_config_plugin:flutter_config /path/to/app --dry-run
+//   dart run flutter_config_plugin:flutter_config --platforms android
 
 import 'dart:io';
 
