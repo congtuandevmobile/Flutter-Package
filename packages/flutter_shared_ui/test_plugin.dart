@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter_config_plugin/flutter_config_plugin.dart';
-import 'package:flutter_config_plugin/src/android/android_plugins.dart' hide withAndroidPermission;
+import 'package:flutter_config_plugin/src/android/android_plugins.dart'
+    hide withAndroidPermission;
 
 void main() async {
   final projectDir = Directory('../../apps/flutter_package');
@@ -12,14 +13,16 @@ void main() async {
   // --- environment ---
   final env = 'dev'; // 'dev' | 'prod'
   final isProd = env == 'prod';
-  
+
   final appName = isProd ? 'Tuan Test Prod' : 'Tuan Test UAT';
-  final bundleId = isProd ? 'tuannc2.test.flutter-plugin' : 'tuannc2.test.flutter-plugin.dev';
-  
+  final bundleId = isProd
+      ? 'tuannc2.test.flutter-plugin'
+      : 'tuannc2.test.flutter-plugin.dev';
+
   final apiUrl = isProd ? 'tuannc2.com.vn' : 'tuannc2-uat.com.vn';
   final googleMapsKey = 'abc-lll123';
   final bgGeoLicense = 'abc-ll123';
-  
+
   // ID
   final fbAppId = '1234';
   final fbClientToken = 'abcd1234';
@@ -40,31 +43,38 @@ void main() async {
     withDisplayName(appName),
     withBundleIdentifier(bundleId),
     withDeploymentTarget('14.0'),
-    
+
     // Quyền (Permissions)
     withIosPermissions({
-      IosPermissions.camera: '"APPNAME" needs access to your camera to let you take a profile avatar photo.',
-      IosPermissions.healthShare: '"APPNAME" needs read access to your health data to sync your activities.',
-      IosPermissions.healthUpdate: '"APPNAME" needs write access to your health data.',
-      IosPermissions.locationAlways: '"APPNAME" needs background location access to track your running activities.',
-      IosPermissions.motion: 'APPNAME uses motion data to improve activity tracking accuracy.',
-      IosPermissions.location: '"APPNAME" needs access to your location to track your running activities.',
+      IosPermissions.camera:
+          '"APPNAME" needs access to your camera to let you take a profile avatar photo.',
+      IosPermissions.healthShare:
+          '"APPNAME" needs read access to your health data to sync your activities.',
+      IosPermissions.healthUpdate:
+          '"APPNAME" needs write access to your health data.',
+      IosPermissions.locationAlways:
+          '"APPNAME" needs background location access to track your running activities.',
+      IosPermissions.motion:
+          'APPNAME uses motion data to improve activity tracking accuracy.',
+      IosPermissions.location:
+          '"APPNAME" needs access to your location to track your running activities.',
       IosPermissions.microphone: '"APPNAME" needs access to your microphone.',
-      IosPermissions.photoLibraryAddUsage: '"APPNAME" needs access to save photos to your library.',
-      IosPermissions.photoLibrary: 'APPNAME needs access to your photo library to let you set a profile avatar.',
+      IosPermissions.photoLibraryAddUsage:
+          '"APPNAME" needs access to save photos to your library.',
+      IosPermissions.photoLibrary:
+          'APPNAME needs access to your photo library to let you set a profile avatar.',
     }),
 
     // --- CẤU HÌNH INFO.PLIST (iOS) ---
     withInfoPlistValue('API_URL', apiUrl),
     withInfoPlistValue('GOOGLE_MAPS_API_KEY', googleMapsKey),
     withInfoPlistValue('GIDClientID', gidClientId),
-    withInfoPlistValue('BGTaskSchedulerPermittedIdentifiers', ['com.tuannc2.healthkit.sync']),
+    withInfoPlistValue('BGTaskSchedulerPermittedIdentifiers', [
+      'com.tuannc2.healthkit.sync',
+    ]),
 
     // Google Sign-In Scheme
-    withIosUrlScheme(
-      role: 'Editor',
-      schemes: [googleScheme],
-    ),
+    withIosUrlScheme(role: 'Editor', schemes: [googleScheme]),
 
     // Web Auth Callback Scheme
     withIosUrlScheme(
@@ -79,7 +89,7 @@ void main() async {
     withAndroidName(appName),
     withAndroidPackage(bundleId),
     withPredictiveBackGesture(enabled: true),
-    
+
     (config) {
       final permissions = [
         'android.permission.INTERNET',
@@ -107,38 +117,32 @@ void main() async {
     },
 
     withAndroidPermissionMaxSdk('android.permission.READ_EXTERNAL_STORAGE', 32),
-    withAndroidPermissionMaxSdk('android.permission.WRITE_EXTERNAL_STORAGE', 32),
+    withAndroidPermissionMaxSdk(
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      32,
+    ),
     withAndroidQueryIntent('android.intent.action.PROCESS_TEXT', 'text/plain'),
 
     withAndroidApplicationMetaData('flutterEmbedding', '2'),
-    withAndroidApplicationMetaData('com.google.android.geo.API_KEY', googleMapsKey),
-    withAndroidApplicationMetaData('com.google.android.gms.maps.RENDERER', 'LATEST'),
+    withAndroidApplicationMetaData(
+      'com.google.android.geo.API_KEY',
+      googleMapsKey,
+    ),
+    withAndroidApplicationMetaData(
+      'com.google.android.gms.maps.RENDERER',
+      'LATEST',
+    ),
 
     // --- KHAI BÁO FILE PROVIDER ---
     withAndroidFileProvider(authorities: '$bundleId.fileprovider'),
 
     // ==========================================
-    // THIRD-PARTY PLUGINS 
+    // THIRD-PARTY PLUGINS
     // ==========================================
-    withWebAuthCallback(
-      schemes: ['tuannc2', 'tuannc2-uat'],
-    ),
-    withFacebook(
-      appId: fbAppId,
-      clientToken: fbClientToken,
-      displayName: 'tuannc2',
-    ),
-    
-    withTransistorsoftLocation(
-      licenseKey: bgGeoLicense,
-    ),
-    
-    withInstagram(),
-    withTts(),
   ]);
 
   print('Starting apply config ${appName}...');
-  
+
   try {
     await compileModsAsync(
       config,
