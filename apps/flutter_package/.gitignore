@@ -1,3 +1,6 @@
+# Secrets — NEVER commit real values
+.env
+
 # Miscellaneous
 *.class
 *.log

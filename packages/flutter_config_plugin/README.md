@@ -1,175 +1,780 @@
-# Flutter Config Plugin
+# flutter_config_plugin
 
-A Dart library inspired by Expo Config Plugins, designed to read and modify native project configuration files (`Info.plist`, `AndroidManifest.xml`, `.pbxproj`, etc.) programmatically. This is particularly useful for building CLI tools, scripts, or Flutter packages that need to automatically set up native platform configurations.
+A composable pipeline for modifying iOS and Android native project files, inspired by [`@expo/config-plugins`](https://github.com/expo/expo/tree/main/packages/%40expo/config-plugins).
 
-## Features
+Configure `Info.plist`, `AndroidManifest.xml`, entitlements, `strings.xml`, and Xcode project settings — all from a single `flutter_config.yaml` file. Environment variables are resolved from `.env` in development and from CI variables in production, with no code changes required.
 
-- **iOS Configs**: Read and modify `Info.plist`, `.entitlements`, and Xcode project settings (`.pbxproj`).
-- **Android Configs**: Read and modify `AndroidManifest.xml`, `build.gradle`, `strings.xml`, `colors.xml`, etc.
-- **Cross-Platform**: Update bundle identifiers, application names, permissions, and other native metadata.
+---
 
-## Installation
+## Table of Contents
 
-Add this to your package's `pubspec.yaml` (or link it locally):
+- [How it works](#how-it-works)
+- [Quick start](#quick-start)
+- [flutter_config.yaml reference](#flutter_configyaml-reference)
+  - [app](#app)
+  - [generic › iOS](#generic--ios)
+  - [generic › Android](#generic--android)
+- [Environment variables](#environment-variables)
+- [CLI reference](#cli-reference)
+- [Dart API](#dart-api)
+- [CI/CD integration](#cicd-integration)
+- [Git workflow](#git-workflow)
+- [Extending with custom plugins](#extending-with-custom-plugins)
+
+---
+
+## How it works
+
+```
+flutter_config.yaml  +  .env / CI variables
+         │
+         ▼
+  dart run flutter_config_plugin:flutter_config
+         │
+         ├─► ios/Runner/Info.plist
+         ├─► ios/Runner/Runner.entitlements
+         ├─► android/app/src/main/AndroidManifest.xml
+         └─► android/app/src/main/res/values/strings.xml
+```
+
+The tool uses a **mod pipeline** pattern:
+
+1. `withXxx()` functions **register** modifications onto a `FlutterConfig` object (pure functions — no I/O at this stage).
+2. `compileModsAsync()` **executes** the chain: base mods read the native file, pass it through every registered modifier in order, then write the result back.
+
+Each mod is **idempotent** — running the tool multiple times produces the same output.
+
+---
+
+## Quick start
+
+### 1. Add the dependency
 
 ```yaml
-dependencies:
-  flutter_config_plugin:
-    path: ../flutter_config_plugin # Or git/pub depending on your setup
+# pubspec.yaml
+dev_dependencies:
+  flutter_config_plugin: ^0.0.1
 ```
 
-## How It Works
+```bash
+flutter pub get
+```
 
-This plugin operates directly on the configuration files (like XML files for Android or text files like `.pbxproj` for iOS). 
-Instead of spinning up native environments, it uses targeted RegExp manipulation to parse and modify configuration blocks efficiently. 
-This allows it to run entirely in pure Dart and execute extremely fast.
+### 2. Create `flutter_config.yaml` in your Flutter app directory
 
-## Usage Guide
+```yaml
+app:
+  name: ${APP_NAME}
+  bundleIdentifier: ${BUNDLE_ID}
+  applicationId: ${APPLICATION_ID}
+  version: "1.0.0"
 
-Here are some common examples of how to use this plugin to manipulate iOS and Android configurations.
+generic:
+  ios:
+    infoPlist:
+      API_URL: ${API_URL}
+    permissions:
+      NSCameraUsageDescription: '"MyApp" needs camera access.'
 
-### iOS
+  android:
+    permissions:
+      - android.permission.INTERNET
+      - android.permission.CAMERA
+```
 
-#### Modifying `Info.plist`
+### 3. Create `.env` in the same directory as `flutter_config.yaml`
 
-You can use the helper `getInfoPlistPathFromPbxproj` to dynamically find the correct `Info.plist` file, even if it's placed inside a custom target.
+```bash
+# .env  (never commit this file — add it to .gitignore)
+APP_NAME=MyApp Dev
+BUNDLE_ID=com.example.myapp
+APPLICATION_ID=com.example.myapp
+API_URL=https://api.example.com
+```
+
+Keep a `.env.example` with placeholder values committed to git so teammates know which variables are required:
+
+```bash
+cp .env.example .env   # then fill in real values
+```
+
+### 4. Run the tool
+
+```bash
+dart run flutter_config_plugin:flutter_config path/to/your/app
+```
+
+---
+
+## flutter_config.yaml reference
+
+### `app`
+
+Top-level app metadata. All fields support `${VAR}` substitution.
+
+```yaml
+app:
+  name: ${APP_NAME}               # App display name
+  bundleIdentifier: ${BUNDLE_ID}  # iOS bundle identifier
+  applicationId: ${APPLICATION_ID} # Android application ID
+  version: "1.0.0"               # Semver string
+```
+
+---
+
+### `generic › iOS`
+
+All modifications under `generic.ios` target **iOS native files**.
+
+#### `infoPlist`
+
+Writes arbitrary key-value pairs to `Info.plist`. Supports strings, booleans, numbers, arrays, and nested dicts.
+
+```yaml
+generic:
+  ios:
+    infoPlist:
+      # String
+      API_URL: ${API_URL}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      GIDClientID: ${GOOGLE_CLIENT_ID}
+
+      # Boolean (no quotes)
+      CADisableMinimumFrameDurationOnPhone: true
+
+      # Array
+      BGTaskSchedulerPermittedIdentifiers:
+        - com.example.healthkit.sync
+
+      # Nested dict (e.g. App Transport Security)
+      NSAppTransportSecurity:
+        NSAllowsArbitraryLoads: false
+        NSExceptionDomains:
+          api.example.com:
+            NSExceptionAllowsInsecureHTTPLoads: true
+            NSThirdPartyExceptionRequiresForwardSecrecy: false
+
+      # SDK-specific keys
+      FacebookAppID: ${FACEBOOK_APP_ID}
+      FacebookClientToken: ${FACEBOOK_CLIENT_TOKEN}
+      FacebookDisplayName: ${APP_NAME}
+      TSLocationManagerLicense: ${BG_GEOLOCATION_LICENSE}
+```
+
+#### `permissions`
+
+Shorthand for `NSXxxUsageDescription` keys. Functionally equivalent to writing them in `infoPlist`, but grouped for clarity.
+
+```yaml
+generic:
+  ios:
+    permissions:
+      NSCameraUsageDescription: '"MyApp" needs camera access.'
+      NSMicrophoneUsageDescription: '"MyApp" needs microphone access.'
+      NSPhotoLibraryUsageDescription: 'MyApp needs photo library access.'
+      NSPhotoLibraryAddUsageDescription: '"MyApp" needs to save photos.'
+      NSLocationWhenInUseUsageDescription: '"MyApp" needs location while in use.'
+      NSLocationAlwaysAndWhenInUseUsageDescription: '"MyApp" needs background location.'
+      NSMotionUsageDescription: 'MyApp uses motion data for activity tracking.'
+      NSHealthShareUsageDescription: '"MyApp" needs to read health data.'
+      NSHealthUpdateUsageDescription: '"MyApp" needs to write health data.'
+      NSBluetoothAlwaysUsageDescription: '"MyApp" needs Bluetooth access.'
+      NSUserTrackingUsageDescription: '"MyApp" uses tracking for personalization.'
+      NSFaceIDUsageDescription: '"MyApp" uses Face ID for authentication.'
+      NSContactsUsageDescription: '"MyApp" needs access to your contacts.'
+```
+
+#### `backgroundModes`
+
+Merges values into the `UIBackgroundModes` array in `Info.plist`. Existing values are preserved; duplicates are skipped.
+
+```yaml
+generic:
+  ios:
+    backgroundModes:
+      - location           # flutter_background_geolocation
+      - fetch
+      - processing         # BGTaskScheduler
+      - remote-notification
+      - audio
+      - voip
+      - bluetooth-central
+      - bluetooth-peripheral
+      - external-accessory
+      - nearby-interaction
+```
+
+#### `urlSchemes`
+
+Writes `CFBundleURLTypes` entries for URL scheme registration (Google Sign-In, Facebook, deep links).
+
+```yaml
+generic:
+  ios:
+    urlSchemes:
+      # Google Sign-In (reversed client ID)
+      - role: Editor          # CFBundleTypeRole: Editor | Viewer
+        name: google          # CFBundleName (optional)
+        schemes:
+          - ${GOOGLE_REVERSED_CLIENT_ID}
+
+      # Facebook — prefix "fb" + numeric app ID
+      - schemes:
+          - fb${FACEBOOK_APP_ID}
+
+      # Deep link callback (multiple schemes in one entry)
+      - role: Editor
+        name: app_callback
+        schemes:
+          - ${URL_SCHEME}
+          - ${URL_SCHEME_UAT}
+```
+
+#### `queriesSchemes`
+
+Merges values into `LSApplicationQueriesSchemes` (what apps your app can query with `canOpenURL`).
+
+```yaml
+generic:
+  ios:
+    queriesSchemes:
+      - fbapi
+      - fb-messenger-share-api
+      - facebook-stories
+      - instagram-stories
+      - App-prefs
+```
+
+#### `entitlements`
+
+Writes to `ios/Runner/Runner.entitlements` — a **separate file** from `Info.plist`.
+
+```yaml
+generic:
+  ios:
+    entitlements:
+      # Associated domains (Universal Links, Sign in with Apple)
+      com.apple.developer.associated-domains:
+        - applinks:example.com
+        - webcredentials:example.com
+
+      # Push notifications environment
+      aps-environment: production     # or: development
+
+      # HealthKit
+      com.apple.developer.healthkit: true
+      com.apple.developer.healthkit.access:
+        - health-records
+
+      # App Groups (shared container between app and extensions)
+      com.apple.security.application-groups:
+        - group.com.example.myapp
+
+      # iCloud (CloudKit)
+      com.apple.developer.icloud-services:
+        - CloudKit
+      com.apple.developer.icloud-container-identifiers:
+        - iCloud.com.example.myapp
+```
+
+---
+
+### `generic › Android`
+
+All modifications under `generic.android` target **Android native files**.
+
+#### `permissions`
+
+Adds `<uses-permission>` elements to the root `<manifest>`. Supports optional `maxSdkVersion`.
+
+```yaml
+generic:
+  android:
+    permissions:
+      # Simple string form
+      - android.permission.INTERNET
+      - android.permission.ACCESS_NETWORK_STATE
+      - android.permission.CAMERA
+      - android.permission.READ_MEDIA_IMAGES
+      - android.permission.READ_MEDIA_VIDEO
+      - android.permission.ACCESS_FINE_LOCATION
+      - android.permission.ACCESS_COARSE_LOCATION
+      - android.permission.ACCESS_BACKGROUND_LOCATION
+      - android.permission.FOREGROUND_SERVICE
+      - android.permission.FOREGROUND_SERVICE_LOCATION
+      - android.permission.FOREGROUND_SERVICE_DATA_SYNC
+      - android.permission.RECEIVE_BOOT_COMPLETED
+      - android.permission.POST_NOTIFICATIONS
+      - android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+      - android.permission.ACTIVITY_RECOGNITION
+      - com.google.android.gms.permission.ACTIVITY_RECOGNITION
+
+      # With maxSdkVersion attribute
+      - name: android.permission.READ_EXTERNAL_STORAGE
+        maxSdkVersion: 32
+      - name: android.permission.WRITE_EXTERNAL_STORAGE
+        maxSdkVersion: 32
+```
+
+#### `features`
+
+Adds `<uses-feature>` elements to the root `<manifest>`.
+
+```yaml
+generic:
+  android:
+    features:
+      - name: android.hardware.camera
+        required: false    # false = optional, app can run without it
+      - name: android.hardware.camera.autofocus
+        required: false
+      - name: android.hardware.nfc
+        required: false
+      - name: android.hardware.bluetooth_le
+        required: false
+      - name: android.hardware.location.gps
+        required: false
+```
+
+#### `strings`
+
+Writes `<string>` elements to `res/values/strings.xml`. Used when SDKs require resource references (`@string/xxx`) instead of raw values in the manifest.
+
+```yaml
+generic:
+  android:
+    strings:
+      - name: facebook_app_id
+        value: ${FACEBOOK_APP_ID}
+      - name: facebook_client_token
+        value: ${FACEBOOK_CLIENT_TOKEN}
+```
+
+#### `manifest.applicationAttributes`
+
+Sets attributes directly on the `<application>` element.
+
+```yaml
+generic:
+  android:
+    manifest:
+      applicationAttributes:
+        usesCleartextTraffic: "true"
+        networkSecurityConfig: '@xml/network_security_config'
+        largeHeap: "true"
+```
+
+#### `manifest.application.meta-data`
+
+Adds `<meta-data>` elements inside `<application>`.
+
+```yaml
+generic:
+  android:
+    manifest:
+      application:
+        meta-data:
+          - name: flutterEmbedding
+            value: "2"
+          - name: com.google.android.geo.API_KEY
+            value: ${GOOGLE_MAPS_API_KEY}
+          - name: com.google.android.gms.maps.RENDERER
+            value: LATEST
+          # Reference a strings.xml value
+          - name: com.facebook.sdk.ApplicationId
+            value: '@string/facebook_app_id'
+          - name: com.facebook.sdk.ClientToken
+            value: '@string/facebook_client_token'
+          - name: com.transistorsoft.locationmanager.license
+            value: ${BG_GEOLOCATION_LICENSE}
+```
+
+#### `manifest.application.services`
+
+Adds `<service>` elements inside `<application>`.
+
+```yaml
+generic:
+  android:
+    manifest:
+      application:
+        services:
+          - name: com.transistorsoft.locationmanager.service.TrackingService
+            foregroundServiceType: location
+          - name: com.transistorsoft.locationmanager.service.LocationRequestService
+            foregroundServiceType: location
+          - name: com.transistorsoft.locationmanager.service.ActivityRecognitionService
+            foregroundServiceType: dataSync
+            exported: "false"
+            # Optional intent filters on a service
+            intentFilters:
+              - actions:
+                  - com.transistorsoft.locationmanager.service.ActivityRecognitionService
+```
+
+#### `manifest.application.receivers`
+
+Adds `<receiver>` elements inside `<application>`.
+
+```yaml
+generic:
+  android:
+    manifest:
+      application:
+        receivers:
+          - name: com.transistorsoft.locationmanager.util.BootReceiver
+            exported: "false"
+            intentFilters:
+              - actions:
+                  - android.intent.action.BOOT_COMPLETED
+                  - android.intent.action.QUICKBOOT_POWERON
+                  - com.htc.intent.action.QUICKBOOT_POWERON
+                categories:           # optional
+                  - android.intent.category.DEFAULT
+```
+
+#### `manifest.application.activities`
+
+Adds `<activity>` elements inside `<application>`. Supports `data` (single element) and `dataList` (multiple elements) for complex deep links.
+
+```yaml
+generic:
+  android:
+    manifest:
+      application:
+        activities:
+          # OAuth / deep link callback (flutter_web_auth_2)
+          - name: com.linusu.flutter_web_auth_2.CallbackActivity
+            exported: "true"
+            intentFilters:
+              - label: flutter_web_auth_2    # android:label on <intent-filter>
+                actions:
+                  - android.intent.action.VIEW
+                categories:
+                  - android.intent.category.DEFAULT
+                  - android.intent.category.BROWSABLE
+                # Multiple <data> elements (one per scheme)
+                dataList:
+                  - scheme: ${URL_SCHEME}
+                  - scheme: ${URL_SCHEME_UAT}
+
+          # Single <data> with scheme + host + path on the same element
+          - name: com.example.DeepLinkActivity
+            exported: "true"
+            intentFilters:
+              - actions:
+                  - android.intent.action.VIEW
+                categories:
+                  - android.intent.category.DEFAULT
+                  - android.intent.category.BROWSABLE
+                data:
+                  scheme: https
+                  host: example.com
+                  pathPrefix: /invite
+```
+
+#### `manifest.application.providers`
+
+Adds `<provider>` elements inside `<application>`. Supports multiple `metaData` entries and `grantUriPermissionList`.
+
+```yaml
+generic:
+  android:
+    manifest:
+      application:
+        providers:
+          - name: androidx.core.content.FileProvider
+            authorities: ${APPLICATION_ID}.fileprovider
+            exported: "false"
+            grantUriPermissions: "true"
+            metaData:
+              - name: android.support.FILE_PROVIDER_PATHS
+                resource: '@xml/file_paths'
+            # Optional <grant-uri-permission> elements
+            grantUriPermissionList:
+              - pathPattern: '.*'
+```
+
+#### `manifest.queries`
+
+Adds entries to the `<queries>` block (required to query other apps on Android 11+).
+
+```yaml
+generic:
+  android:
+    manifest:
+      queries:
+        # Query by package name
+        - package: com.facebook.katana
+        - package: com.instagram.android
+
+        # Query by content provider authority
+        - provider: com.facebook.katana.provider.PlatformProvider
+
+        # Query by intent action (optionally with a data filter)
+        - intent:
+            action: android.intent.action.PROCESS_TEXT
+            data:
+              mimeType: text/plain
+        - intent:
+            action: com.facebook.stories.ADD_TO_STORY
+        - intent:
+            action: android.intent.action.TTS_SERVICE
+```
+
+---
+
+## Environment variables
+
+Any value in `flutter_config.yaml` can reference an environment variable with `${VAR_NAME}` syntax. References can appear anywhere in a string:
+
+```yaml
+# Standalone
+GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+
+# Embedded (prefix is preserved)
+- fb${FACEBOOK_APP_ID}                    # → fb123456789
+- ${GOOGLE_REVERSED_CLIENT_ID}            # → com.googleusercontent.apps.xxx
+```
+
+### Resolution order (highest → lowest)
+
+| Priority | Source | When |
+|---|---|---|
+| 1 | `Platform.environment` | CI runner, shell exports |
+| 2 | `.env` file in project root | Local development |
+| 3 | Empty string | Variable not found anywhere |
+
+### `.env` format
+
+```bash
+# .env — never commit this file
+APP_NAME=MyApp
+BUNDLE_ID=com.example.myapp
+APPLICATION_ID=com.example.myapp
+URL_SCHEME=myapp
+URL_SCHEME_UAT=myapp-uat
+API_URL=https://api.example.com
+GOOGLE_MAPS_API_KEY=AIzaSy...
+GOOGLE_CLIENT_ID=123456.apps.googleusercontent.com
+GOOGLE_REVERSED_CLIENT_ID=com.googleusercontent.apps.123456
+FACEBOOK_APP_ID=123456789
+FACEBOOK_CLIENT_TOKEN=abc123
+BG_GEOLOCATION_LICENSE=eyJhbGci...
+```
+
+---
+
+## CLI reference
+
+```
+dart run flutter_config_plugin:flutter_config [project_root] [options]
+```
+
+| Argument / Option | Default | Description |
+|---|---|---|
+| `project_root` | Current directory | Path to the Flutter project (contains `flutter_config.yaml`) |
+| `--dry-run` | `false` | Resolve and print config without writing any files |
+| `--check` | `false` | Print which env vars are required/missing and exit |
+| `--no-fail-env` | `false` | Continue even if required env vars are missing |
+| `--platforms ios,android` | `ios,android` | Restrict which platforms to process |
+
+```bash
+# Apply to both platforms (default)
+dart run flutter_config_plugin:flutter_config path/to/app
+
+# Preview without writing files
+dart run flutter_config_plugin:flutter_config path/to/app --dry-run
+
+# Check env var requirements
+dart run flutter_config_plugin:flutter_config path/to/app --check
+
+# Android only
+dart run flutter_config_plugin:flutter_config path/to/app --platforms android
+```
+
+---
+
+## Dart API
+
+### Core types
+
+```dart
+// A plugin: takes a config, returns a modified config (pure)
+typedef ConfigPlugin = FlutterConfig Function(FlutterConfig config);
+
+// Root config object passed through every plugin and mod
+class FlutterConfig {
+  final String name;
+  final String? bundleIdentifier;
+  final String? applicationId;
+  final String version;
+  final Map<String, Map<String, ConfigMod>> mods;
+}
+```
+
+### Composing plugins
 
 ```dart
 import 'package:flutter_config_plugin/flutter_config_plugin.dart';
 
-Future<void> updateInfoPlist(String projectRoot) async {
-  // Find and load the Info.plist file. 
-  // You can optionally filter by targetName if your project has multiple targets (e.g. App Clips).
-  final plistPath = await getInfoPlistPathFromPbxproj(
-    projectRoot, 
-    buildConfiguration: 'Release', 
-    targetName: 'Runner'
-  ) ?? 'ios/Runner/Info.plist';
-  
-  final plist = await InfoPlist.load(plistPath);
+var config = const FlutterConfig(
+  name: 'MyApp',
+  bundleIdentifier: 'com.example.myapp',
+  applicationId: 'com.example.myapp',
+);
 
-  // Set properties
-  plist.setProperty('NSCameraUsageDescription', 'This app requires camera access.');
-  plist.setProperty('UIRequiresFullScreen', true);
+config = withPlugins(config, [
+  withDisplayName('My Awesome App'),
+  withBundleIdentifier('com.example.myapp'),
+  withDeploymentTarget('14.0'),
+  withIosPermission(key: IosPermissions.camera, description: 'Scan QR codes'),
+  withAssociatedDomains(['applinks:example.com']),
+  withAndroidPermission(AndroidPermissions.camera),
+  withAndroidName('My Awesome App'),
+]);
 
-  // Save the changes back to the file
-  await plist.save();
-}
+await compileModsAsync(
+  config,
+  CompileModsOptions(projectRoot: '/path/to/project'),
+);
 ```
 
-#### Modifying `.pbxproj` Build Settings
-
-You can dynamically search and update specific targets or configurations inside Xcode.
+### Writing a custom mod
 
 ```dart
-import 'package:flutter_config_plugin/flutter_config_plugin.dart';
+// Mod that sets a raw Info.plist key
+ConfigPlugin withMyLicenseKey(String key) {
+  return (config) => withInfoPlist(config, (plist) {
+    plist['MySDKLicense'] = key;
+    return plist;
+  });
+}
 
-Future<void> updateXcodeProject(String projectRoot) async {
-  final project = await resolvePathOrProject(projectRoot);
-  if (project == null) return;
-
-  // Set the Bundle Identifier across all build configurations globally
-  project.productBundleIdentifier = 'com.example.myapp';
-
-  // Set iOS Deployment Target
-  project.deploymentTarget = '13.0';
-
-  // Read a custom build property for a specific target
-  final existingPlist = project.getBuildProperty(
-    'INFOPLIST_FILE', 
-    buildName: 'Debug', 
-    targetName: 'Runner'
-  );
-
-  // Set custom build properties for a specific configuration
-  project.setBuildProperty('ENABLE_BITCODE', 'NO', buildName: 'Release');
-
-  // Update target attributes (e.g., Development Team)
-  project.setTargetAttribute('DevelopmentTeam', 'ABC1234567');
-
-  // Add Known Regions for localization
-  project.addKnownRegion('fr');
-
-  await project.save();
+// Mod that adds a <receiver> to AndroidManifest.xml
+ConfigPlugin withMyReceiver() {
+  return (config) => withAndroidManifest(config, (doc) {
+    final app = getMainApplicationOrThrow(doc);
+    app.children.add(XmlElement(XmlName('receiver'), [
+      XmlAttribute(XmlName('android:name'), 'com.example.MyReceiver'),
+      XmlAttribute(XmlName('android:exported'), 'false'),
+    ]));
+    return doc;
+  });
 }
 ```
 
-#### Modifying Entitlements
+### Run-once guard
+
+Prevents a plugin from being applied twice if multiple packages depend on it:
 
 ```dart
-import 'package:flutter_config_plugin/flutter_config_plugin.dart';
-
-Future<void> updateEntitlements(String projectRoot) async {
-  final entitlementsPath = 'ios/Runner/Runner.entitlements';
-  final entitlements = await Entitlements.load(entitlementsPath);
-
-  entitlements.setProperty('aps-environment', 'production');
-  await entitlements.save();
-}
+ConfigPlugin myPlugin() => createRunOncePlugin(
+  (config) => withPlugins(config, [
+    withMyLicenseKey('abc'),
+    withMyReceiver(),
+  ]),
+  name: 'my-sdk',
+  version: '1.0.0',
+);
 ```
 
-### Android
-
-#### Modifying `AndroidManifest.xml`
+### Apply a YAML config at runtime
 
 ```dart
-import 'package:flutter_config_plugin/flutter_config_plugin.dart';
+loadDotEnv('/path/to/app');
+final rawConfig = parseYamlToMap(File('flutter_config.yaml').readAsStringSync());
 
-Future<void> updateManifest(String projectRoot) async {
-  final manifestPath = 'android/app/src/main/AndroidManifest.xml';
-  final manifest = await AndroidManifest.load(manifestPath);
-
-  // Add a permission
-  manifest.addPermission('android.permission.INTERNET');
-  manifest.addPermission('android.permission.CAMERA');
-
-  // Update application attributes
-  manifest.setAppAttribute('android:allowBackup', 'false');
-
-  // Add metadata inside <application>
-  manifest.addMetaData('com.google.firebase.messaging.default_notification_channel_id', 'high_importance_channel');
-
-  await manifest.save();
-}
+var config = FlutterConfig(
+  name: rawConfig['app']['name'] as String,
+  bundleIdentifier: rawConfig['app']['bundleIdentifier'] as String?,
+  applicationId: rawConfig['app']['applicationId'] as String?,
+);
+config = withDynamicConfig(rawConfig)(config);
+await compileModsAsync(config, CompileModsOptions(projectRoot: '/path/to/app'));
 ```
 
-#### Modifying URI Schemes (Deep Links)
+---
 
-You can easily append a custom URI scheme to your Android application.
+## CI/CD integration
+
+In CI, all `${VAR}` references are resolved from the runner's environment — no `.env` file is needed.
+
+### GitHub Actions
+
+```yaml
+- name: Apply native config
+  env:
+    APP_NAME: ${{ secrets.APP_NAME }}
+    BUNDLE_ID: ${{ secrets.BUNDLE_ID }}
+    APPLICATION_ID: ${{ secrets.APPLICATION_ID }}
+    GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+    FACEBOOK_APP_ID: ${{ secrets.FACEBOOK_APP_ID }}
+    FACEBOOK_CLIENT_TOKEN: ${{ secrets.FACEBOOK_CLIENT_TOKEN }}
+    BG_GEOLOCATION_LICENSE: ${{ secrets.BG_GEOLOCATION_LICENSE }}
+  run: dart run flutter_config_plugin:flutter_config apps/my_app
+```
+
+### GitLab CI
+
+Set variables in **Settings → CI/CD → Variables**, then:
+
+```yaml
+before_script:
+  - flutter pub get
+  - dart run flutter_config_plugin:flutter_config apps/my_app
+```
+
+---
+
+## Git workflow
+
+The tool writes real API keys into `AndroidManifest.xml` and `Info.plist`, which are git-tracked files. To prevent accidental commits of secrets, mark them as intentionally modified:
+
+```bash
+# Run once after cloning
+git update-index --skip-worktree \
+  android/app/src/main/AndroidManifest.xml \
+  ios/Runner/Info.plist \
+  ios/Runner/Runner.entitlements
+```
+
+Git will never show these files as changed or include them in commits, even though the files are modified on disk.
+
+To temporarily restore tracking (e.g. to update the base file):
+
+```bash
+git update-index --no-skip-worktree android/app/src/main/AndroidManifest.xml
+# edit the base file (without real secrets), then:
+git add android/app/src/main/AndroidManifest.xml && git commit -m "chore: update base manifest"
+git update-index --skip-worktree android/app/src/main/AndroidManifest.xml
+```
+
+---
+
+## Extending with custom plugins
+
+Register reusable team plugins in `pluginRegistry`:
 
 ```dart
-import 'package:flutter_config_plugin/flutter_config_plugin.dart';
-
-// Use it inside a plugin pipeline:
-ConfigPlugin withMyScheme() {
-  return (config) {
-    // This will automatically find the correct intent-filter or create one 
-    // and inject <data android:scheme="myapp" />
-    return withAndroidScheme('myapp')(config);
-  };
-}
+pluginRegistry['my-sdk'] = (props) {
+  return (config) => withPlugins(config, [
+    withMyLicenseKey(props['licenseKey'] as String),
+    withMyReceiver(),
+  ]);
+};
 ```
 
-#### Modifying `strings.xml`
+Reference them in `flutter_config.yaml`:
 
-```dart
-import 'package:flutter_config_plugin/flutter_config_plugin.dart';
-
-Future<void> updateStrings(String projectRoot) async {
-  final stringsPath = 'android/app/src/main/res/values/strings.xml';
-  final strings = await AndroidStrings.load(stringsPath);
-
-  strings.setString('app_name', 'My Awesome App');
-  strings.setString('custom_key', 'Custom Value');
-
-  await strings.save();
-}
+```yaml
+plugins:
+  - name: my-sdk
+    props:
+      licenseKey: ${MY_SDK_LICENSE}
 ```
 
-## Known Limitations & Differences from Expo Config Plugins
-
-- **Regex-based Parsing:** The `XcodeProject` (.pbxproj) parser relies on Dart regular expressions rather than generating a full abstract syntax tree (AST). 
-- **Unsupported Xcode Actions:** Because it doesn't parse into an object-oriented AST (like the `xcode` Node package used by Expo), complex Xcode file tree operations such as `addResourceFileToGroup`, `ensureGroupRecursively`, or `addFramework` are not currently supported out of the box. You can only manipulate strings inside Build Settings, Target Attributes, and basic text replacements.
+---
 
 ## License
 

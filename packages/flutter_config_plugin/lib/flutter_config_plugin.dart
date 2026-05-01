@@ -109,10 +109,11 @@ export 'src/android/google_services.dart';
 export 'src/android/build_properties.dart';
 export 'src/android/locales.dart';
 
-// ── Third Party ──────────────────────────────────────────────────────────────
+// ── Dynamic & Registry ───────────────────────────────────────────────────────
 
-export 'src/third_party/facebook.dart';
-export 'src/third_party/transistorsoft.dart';
-export 'src/third_party/instagram.dart';
-export 'src/third_party/tts.dart';
-export 'src/third_party/web_auth.dart';
+export 'src/plugins/static_plugins.dart';
+export 'src/plugins/dynamic_config.dart';
+export 'src/plugins/generic_config.dart';
+export 'src/plugins/package_discovery.dart';
+export 'src/utils/env_resolver.dart';
+export 'src/utils/yaml_utils.dart';
